@@ -23,15 +23,11 @@ function isBirthdayToday(birthdateText) {
   return fieldMonth === month && fieldDay === day;
 }
 
-// Moves card to top completely independently - will never affect the badge
-setTimeout(function() {
-  console.log("🎂 Birthday Power-Up: connector.js loaded successfully");
-}, 0);
+console.log("🎂 Birthday Power-Up: connector.js loaded successfully");
 
 TrelloPowerUp.initialize({
 
   "card-badges": function (t) {
-    // STEP 1: Always return the badge first, no matter what
     return t.card("customFieldItems", "id").then(function (card) {
       return t.board("customFields").then(function (board) {
 
@@ -47,19 +43,17 @@ TrelloPowerUp.initialize({
 
         if (isBirthdayToday(fieldItem.value.text)) {
 
-          // STEP 2: Attempt to move card AFTER badge is returned
-          // Wrapped in setTimeout so it runs after the badge response
-          // and cannot interfere with it under any circumstances
+          // Move card to top using t.request which doesn't need appKey/appName
           setTimeout(function() {
-            try {
-              t.getRestApi().then(function(api) {
-                api.put("/cards/" + card.id, { pos: "top" })
-                  .then(function() { console.log("🎂 Card moved to top!"); })
-                  .catch(function(err) { console.log("🎂 Move failed:", err); });
-              }).catch(function(err) { console.log("🎂 REST API error:", err); });
-            } catch(err) {
-              console.log("🎂 Move error:", err);
-            }
+            t.request({
+              url: "/1/cards/" + card.id,
+              method: "PUT",
+              data: { pos: "top" }
+            }).then(function() {
+              console.log("🎂 Card moved to top!");
+            }).catch(function(err) {
+              console.log("🎂 Move failed:", err);
+            });
           }, 500);
 
           return [{ text: "🎂 Birthday", color: "blue" }];
