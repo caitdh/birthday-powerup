@@ -1,10 +1,13 @@
 /* ============================================================
    Birthday Power-Up for Trello
    Custom Field: "Birth date" (mm/dd/yyyy text format)
-   Shows blue 🎂 Birthday badge and moves card to top on birthday
+   Shows blue 🎂 Birthday badge and adds birthday label
    ============================================================ */
 
 const CUSTOM_FIELD_NAME = "Birth date";
+const BIRTHDAY_LABEL_NAME = "🎂 Birthday";
+const APP_NAME = "Birthday Highlighter";
+const API_KEY = "d9ccf2db488309f6f540a1ebfeba86c0"; // Safe to include - not secret
 
 function getTodayMonthDay() {
   const now = new Date();
@@ -23,13 +26,27 @@ function isBirthdayToday(birthdateText) {
   return fieldMonth === month && fieldDay === day;
 }
 
+function tryAddLabel(t, cardId, labelId) {
+  setTimeout(function() {
+    try {
+      t.getRestApi().then(function(api) {
+        api.post("/cards/" + cardId + "/idLabels", { value: labelId })
+          .then(function() { console.log("🎂 Label added!"); })
+          .catch(function(err) { console.log("🎂 Label add failed:", err); });
+      }).catch(function(err) { console.log("🎂 REST API error:", err); });
+    } catch(err) {
+      console.log("🎂 Label error:", err);
+    }
+  }, 500);
+}
+
 console.log("🎂 Birthday Power-Up: connector.js loaded successfully");
 
 TrelloPowerUp.initialize({
 
   "card-badges": function (t) {
-    return t.card("customFieldItems", "id").then(function (card) {
-      return t.board("customFields").then(function (board) {
+    return t.card("customFieldItems", "id", "labels").then(function (card) {
+      return t.board("customFields", "labels").then(function (board) {
 
         const birthdateField = board.customFields.find(
           (f) => f.name === CUSTOM_FIELD_NAME
@@ -43,18 +60,16 @@ TrelloPowerUp.initialize({
 
         if (isBirthdayToday(fieldItem.value.text)) {
 
-          // Move card to top using t.request which doesn't need appKey/appName
-          setTimeout(function() {
-            t.request({
-              url: "/1/cards/" + card.id,
-              method: "PUT",
-              data: { pos: "top" }
-            }).then(function() {
-              console.log("🎂 Card moved to top!");
-            }).catch(function(err) {
-              console.log("🎂 Move failed:", err);
-            });
-          }, 500);
+          // Try to add the label
+          const birthdayLabel = board.labels.find(
+            (l) => l.name === BIRTHDAY_LABEL_NAME
+          );
+          if (birthdayLabel) {
+            const hasLabel = card.labels.some((l) => l.id === birthdayLabel.id);
+            if (!hasLabel) {
+              tryAddLabel(t, card.id, birthdayLabel.id);
+            }
+          }
 
           return [{ text: "🎂 Birthday", color: "blue" }];
         }
@@ -82,4 +97,22 @@ TrelloPowerUp.initialize({
       });
     });
   },
+
+  "authorization-status": function(t) {
+    return t.getRestApi().then(function(api) {
+      return api.isAuthorized().then(function(isAuthorized) {
+        return { authorized: isAuthorized };
+      });
+    });
+  },
+
+  "show-authorization": function(t) {
+    return t.getRestApi().then(function(api) {
+      return api.authorize({ scope: "read,write" });
+    });
+  },
+
+}, {
+  appKey: API_KEY,
+  appName: APP_NAME
 });
